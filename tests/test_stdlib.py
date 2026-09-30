@@ -667,3 +667,101 @@ class TestPaath:
         import_module_via_interpreter(interpreter, "paath")
         interpreter.run('x = paath.dohrao("ab", 3)')
         assert interpreter.globals["x"] == "ababab"
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 19. WhatsApp (WhatsApp Web Integration)
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+class TestWhatsapp:
+    """Tests for jug.stdlib.whatsapp — WhatsApp Web message sender and spam simulator."""
+
+    def test_bhejo_opens_correct_url(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: Any
+    ) -> None:
+        """Verify bhejo() opens the correct WhatsApp Web URL and prints status messages."""
+        from jugaadlang.stdlib import whatsapp
+
+        opened_urls: list[str] = []
+        monkeypatch.setattr(
+            whatsapp.webbrowser, "open", lambda url: opened_urls.append(url) or True
+        )
+
+        phone = "+919876543210"
+        message = "Hello World"
+        whatsapp.bhejo(phone, message)
+
+        assert opened_urls == [
+            "https://web.whatsapp.com/send?phone=+919876543210&text=Hello%20World"
+        ]
+
+        captured = capsys.readouterr()
+        assert f"📱 Opening WhatsApp to send message to {phone}..." in captured.out
+        assert "✅ WhatsApp Web opened. Please press 'Send' manually when it loads." in captured.out
+
+    def test_bhejo_url_encoding(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Verify bhejo() correctly URL-encodes special characters in the message."""
+        import urllib.parse
+
+        from jugaadlang.stdlib import whatsapp
+
+        opened_urls: list[str] = []
+        monkeypatch.setattr(
+            whatsapp.webbrowser, "open", lambda url: opened_urls.append(url) or True
+        )
+
+        phone = "+911234567890"
+        message = "Namaste & Kem Cho? Special chars: = + / % & ? 🚀 नमस्ते"
+        whatsapp.bhejo(phone, message)
+
+        assert len(opened_urls) == 1
+        expected_encoded = urllib.parse.quote(message)
+        expected_url = f"https://web.whatsapp.com/send?phone={phone}&text={expected_encoded}"
+        assert opened_urls[0] == expected_url
+
+    def test_spam_opens_single_browser_tab(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Verify spam() opens only one browser tab regardless of count."""
+        from jugaadlang.stdlib import whatsapp
+
+        opened_urls: list[str] = []
+        monkeypatch.setattr(
+            whatsapp.webbrowser, "open", lambda url: opened_urls.append(url) or True
+        )
+
+        phone = "+919876543210"
+        message = "Spam test"
+        whatsapp.spam(phone, message, count=10)
+
+        assert len(opened_urls) == 1
+        assert opened_urls == [
+            "https://web.whatsapp.com/send?phone=+919876543210&text=Spam%20test"
+        ]
+
+    def test_spam_prints_warning_with_count(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: Any
+    ) -> None:
+        """Verify spam() prints warning containing the message count and phone number."""
+        from jugaadlang.stdlib import whatsapp
+
+        monkeypatch.setattr(
+            whatsapp.webbrowser, "open", lambda url: True
+        )
+
+        phone = "+919876543210"
+        message = "Warning message"
+        count = 50
+        whatsapp.spam(phone, message, count)
+
+        captured = capsys.readouterr()
+        assert f"⚠️ SPAM WARNING: Preparing to send {count} messages to {phone}." in captured.out
+        assert (
+            "In true Jugaad style, this will just open one pre-filled tab, "
+            "you'll have to spam it manually to avoid getting banned!"
+        ) in captured.out
+        assert f"📱 Opening WhatsApp to send message to {phone}..." in captured.out
+        assert "✅ WhatsApp Web opened. Please press 'Send' manually when it loads." in captured.out
